@@ -17,7 +17,7 @@ class _MenuState extends State<Menu> {
         children: [
           const DrawerHeader(
             decoration: BoxDecoration(
-              color: Colors.blue, // Exemplo de cor para o cabeçalho
+              color: Colors.purple, // Exemplo de cor para o cabeçalho
             ),
             child: Text(
               'Menu',
