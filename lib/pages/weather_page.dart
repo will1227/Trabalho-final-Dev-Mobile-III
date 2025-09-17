@@ -1,7 +1,6 @@
-// lib/pages/weather_screen.dart
 import 'package:flutter/material.dart';
 import '../services/weather_service.dart';
-import 'package:intl/intl.dart';
+import 'package:flutterapp/pages/forecast_page.dart'; // Importe a nova tela
 
 class WeatherScreen extends StatefulWidget {
   @override
@@ -10,7 +9,7 @@ class WeatherScreen extends StatefulWidget {
 
 class _WeatherScreenState extends State<WeatherScreen> {
   final _cityController = TextEditingController();
-  Future<List<Map<String, dynamic>>>? _weatherData;
+  Future<Map<String, dynamic>>? _weatherData;
 
   @override
   void initState() {
@@ -20,20 +19,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   void _fetchWeatherByCurrentLocation() {
     setState(() {
-      _weatherData = Future.wait([
-        getWeatherByLocation(),
-        get5DayForecastByLocation(),
-      ]);
+      _weatherData = getWeatherByLocation();
     });
   }
 
   void _searchWeather() {
     if (_cityController.text.isNotEmpty) {
       setState(() {
-        _weatherData = Future.wait([
-          getWeather(_cityController.text),
-          get5DayForecastByLocation(),
-        ]);
+        _weatherData = getWeather(_cityController.text);
       });
     }
   }
@@ -44,14 +37,39 @@ class _WeatherScreenState extends State<WeatherScreen> {
     super.dispose();
   }
 
+  // Função para navegar para a tela de previsão
+  void _navigateToForecast() {
+    Navigator.push(
+      context,
+      // Cria uma transição de página customizada (slide para cima)
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const ForecastPage(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          const begin = Offset(0.0, 1.0);
+          const end = Offset.zero;
+          const curve = Curves.ease;
+
+          var tween =
+              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+
+          return SlideTransition(
+            position: animation.drive(tween),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Clima App'),
+        title: const Text('Clima App'),
         actions: [
           IconButton(
-            icon: Icon(Icons.my_location),
+            icon: const Icon(Icons.my_location),
             onPressed: _fetchWeatherByCurrentLocation,
             tooltip: 'Buscar clima da localização atual',
           ),
@@ -63,105 +81,68 @@ class _WeatherScreenState extends State<WeatherScreen> {
           children: <Widget>[
             TextField(
               controller: _cityController,
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Digite uma cidade',
                 border: OutlineInputBorder(),
               ),
               onSubmitted: (_) => _searchWeather(),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _searchWeather,
-              child: Text('Pesquisar'),
+              child: const Text('Pesquisar'),
             ),
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Expanded(
               child: Center(
-                child: FutureBuilder<List<Map<String, dynamic>>>(
+                child: FutureBuilder<Map<String, dynamic>>(
                   future: _weatherData,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return CircularProgressIndicator();
+                      return const CircularProgressIndicator();
                     } else if (snapshot.hasError) {
                       return Text(
                         'Erro: ${snapshot.error}',
-                        style: TextStyle(color: Colors.red),
+                        style: const TextStyle(color: Colors.red),
                         textAlign: TextAlign.center,
                       );
                     } else if (snapshot.hasData) {
-                      final currentData = snapshot.data![0];
-                      final forecastData = snapshot.data![1];
-
-                      // Verifica se a lista de previsão não está vazia
-                      if (forecastData['list'] == null ||
-                          forecastData['list'].isEmpty) {
-                        return Text('Nenhum dado de previsão encontrado.');
-                      }
-
-                      return SingleChildScrollView(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: <Widget>[
-                            // Informações do clima atual
-                            Text(
-                              '${currentData['name']}, ${currentData['sys']['country']}',
-                              style: TextStyle(
-                                  fontSize: 32, fontWeight: FontWeight.bold),
-                              textAlign: TextAlign.center,
-                            ),
-                            SizedBox(height: 10),
-                            Text(
-                              '${currentData['main']['temp'].toStringAsFixed(1)}°C',
-                              style: TextStyle(
-                                  fontSize: 64, fontWeight: FontWeight.w300),
-                            ),
-                            Text(
-                              'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
-                              style: TextStyle(fontSize: 20),
-                            ),
-                            SizedBox(height: 20),
-                            Text(
-                              currentData['weather'][0]['description'],
-                              style: TextStyle(
-                                  fontSize: 24, fontStyle: FontStyle.italic),
-                            ),
-
-                            SizedBox(height: 40),
-                            Text(
-                              'Previsão para os próximos 2 dias',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            SizedBox(height: 10),
-
-                            // Lista de previsão
-                            // Usamos o loop `for` e adicionamos um `if` para segurança
-                            Column(
-                              children: [
-                                for (int i = 1; i <= 3; i++)
-                                  if ((i * 8) < forecastData['list'].length)
-                                    ListTile(
-                                      title: Text(
-                                        DateFormat('EEE, d').format(
-                                          DateTime.fromMillisecondsSinceEpoch(
-                                            forecastData['list'][i * 8]['dt'] *
-                                                1000,
-                                          ),
-                                        ),
-                                      ),
-                                      subtitle: Text(
-                                        'Min: ${forecastData['list'][i * 8]['main']['temp_min'].toStringAsFixed(1)}°C / Máx: ${forecastData['list'][i * 8]['main']['temp_max'].toStringAsFixed(1)}°C',
-                                      ),
-                                      trailing: Text(forecastData['list'][i * 8]
-                                          ['weather'][0]['description']),
-                                    ),
-                              ],
-                            ),
-                          ],
-                        ),
+                      final currentData = snapshot.data!;
+                      return Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text(
+                            '${currentData['name']}, ${currentData['sys']['country']}',
+                            style: const TextStyle(
+                                fontSize: 32, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            '${currentData['main']['temp'].toStringAsFixed(1)}°C',
+                            style: const TextStyle(
+                                fontSize: 64, fontWeight: FontWeight.w300),
+                          ),
+                          Text(
+                            'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
+                            style: const TextStyle(fontSize: 20),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            currentData['weather'][0]['description'],
+                            style: const TextStyle(
+                                fontSize: 24, fontStyle: FontStyle.italic),
+                          ),
+                          const SizedBox(height: 40),
+                          // Botão para ver a previsão com animação
+                          ElevatedButton(
+                            onPressed: _navigateToForecast,
+                            child: const Text('Ver Previsão de 5 Dias'),
+                          ),
+                        ],
                       );
                     } else {
-                      return Text(
+                      return const Text(
                           'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.');
                     }
                   },
