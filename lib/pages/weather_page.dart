@@ -1,5 +1,7 @@
+// lib/pages/weather_screen.dart
 import 'package:flutter/material.dart';
 import '../services/weather_service.dart';
+// Certifique-se de que o caminho está correto
 
 class WeatherScreen extends StatefulWidget {
   @override
@@ -13,7 +15,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
   @override
   void initState() {
     super.initState();
-    _weatherData = getWeather('São Paulo');
+    // Você pode começar a tela buscando o clima da localização atual
+    _fetchWeatherByCurrentLocation();
+  }
+
+  // Função para buscar o clima pela localização atual
+  void _fetchWeatherByCurrentLocation() {
+    setState(() {
+      _weatherData = getWeatherByLocation();
+    });
   }
 
   void _searchWeather() {
@@ -34,13 +44,20 @@ class _WeatherScreenState extends State<WeatherScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Clima'),
+        title: Text('Clima App'),
+        actions: [
+          // Adicione um botão para buscar a localização
+          IconButton(
+            icon: Icon(Icons.my_location),
+            onPressed: _fetchWeatherByCurrentLocation,
+            tooltip: 'Buscar clima da localização atual',
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: <Widget>[
-            // Campo de texto e botão de pesquisa
             TextField(
               controller: _cityController,
               decoration: InputDecoration(
@@ -80,6 +97,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                             '${data['name']}, ${data['sys']['country']}',
                             style: TextStyle(
                                 fontSize: 32, fontWeight: FontWeight.bold),
+                            textAlign: TextAlign.center,
                           ),
                           SizedBox(height: 10),
                           Text(
@@ -97,12 +115,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
                             style: TextStyle(
                                 fontSize: 24, fontStyle: FontStyle.italic),
                           ),
-                          // Adicione mais informações se quiser, como um ícone do clima
                         ],
                       );
                     } else {
                       return Text(
-                          'Nenhum dado encontrado. Digite uma cidade para pesquisar.');
+                          'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.');
                     }
                   },
                 ),
