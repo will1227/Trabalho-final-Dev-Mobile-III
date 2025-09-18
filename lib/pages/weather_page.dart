@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_typeahead/flutter_typeahead.dart';
-import 'package:intl/intl.dart'; // Mantenha este import para a formatação de datas
+import 'package:intl/intl.dart';
 import '../services/weather_service.dart';
 import '../services/geodb_service.dart';
 
@@ -45,7 +45,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
     super.dispose();
   }
 
-  // Função para processar os dados da API e extrair a previsão diária (da antiga forecast_page.dart)
+  // Função para processar os dados da API e extrair a previsão diária
   List<Map<String, dynamic>> _processDailyForecast(List<dynamic> forecastList) {
     final Map<String, List<double>> dailyTemps = {};
     for (var item in forecastList) {
@@ -81,7 +81,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Usamos um Stack para sobrepor os widgets (fundo e pop-up)
     return Scaffold(
       appBar: AppBar(
         title: const Text('Clima App'),
@@ -180,58 +179,65 @@ class _WeatherScreenState extends State<WeatherScreen> {
               ],
             ),
           ),
-          // Pop-up com AnimatedContainer e fundo escurecido
-          if (_showForecastPopup)
-            GestureDetector(
-              onTap: _toggleForecastPopup,
-              child: AnimatedContainer(
-                duration:
-                    const Duration(milliseconds: 500), // Aumentar a duração
-                color: Colors.black.withOpacity(0.5),
-                alignment: Alignment.bottomCenter,
-                child: Hero(
-                  tag: 'forecast-popup',
-                  child: AnimatedContainer(
-                    duration:
-                        const Duration(milliseconds: 500), // Aumentar a duração
-                    curve: Curves.easeOutExpo, // Curva mais suave na chegada
-                    height: _showForecastPopup
-                        ? MediaQuery.of(context).size.height * 0.75
-                        : 0,
-                    width: MediaQuery.of(context).size.width,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      borderRadius:
-                          BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    child: Column(
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: IconButton(
-                            icon: const Icon(Icons.close, color: Colors.black),
-                            onPressed: _toggleForecastPopup,
-                          ),
+
+          // Pop-up e fundo escuro - MANTENHA-OS SEMPRE NA ÁRVORE DE WIDGETS
+          // A visibilidade e interação são controladas por IgnorePointer e AnimatedOpacity
+          IgnorePointer(
+            ignoring: !_showForecastPopup,
+            child: AnimatedOpacity(
+              opacity: _showForecastPopup ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 1000),
+              child: GestureDetector(
+                onTap: _toggleForecastPopup,
+                child: Container(
+                  color: Colors.black.withOpacity(0.5),
+                  alignment: Alignment.bottomCenter,
+                  child: Hero(
+                    tag: 'forecast-popup',
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutExpo,
+                      height: _showForecastPopup
+                          ? MediaQuery.of(context).size.height * 0.75
+                          : 0,
+                      width: MediaQuery.of(context).size.width,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        borderRadius:
+                            BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Align(
+                              alignment: Alignment.topRight,
+                              child: IconButton(
+                                icon: const Icon(Icons.close,
+                                    color: Colors.black),
+                                onPressed: _toggleForecastPopup,
+                              ),
+                            ),
+                            const Text(
+                              'Previsão de 5 Dias',
+                              style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black),
+                            ),
+                            const Divider(),
+                            _ForecastContent(
+                              processDailyForecast: _processDailyForecast,
+                            ),
+                          ],
                         ),
-                        const Text(
-                          'Previsão de 5 Dias',
-                          style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black),
-                        ),
-                        const Divider(),
-                        Expanded(
-                          child: _ForecastContent(
-                            processDailyForecast: _processDailyForecast,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
+          ),
         ],
       ),
     );
@@ -271,6 +277,9 @@ class _ForecastContent extends StatelessWidget {
           final dailyForecast = processDailyForecast(forecastList);
 
           return ListView.builder(
+            shrinkWrap: true,
+            physics:
+                const NeverScrollableScrollPhysics(), // Isso é importante para evitar que o ListView lute com o SingleChildScrollView por rolagem
             itemCount: dailyForecast.length,
             itemBuilder: (context, index) {
               final dayData = dailyForecast[index];
