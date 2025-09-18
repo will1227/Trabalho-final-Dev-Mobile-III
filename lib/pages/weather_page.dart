@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_typeahead/flutter_typeahead.dart'; // Importe o pacote
+import 'package:flutter_typeahead/flutter_typeahead.dart';
+import 'package:intl/intl.dart'; // Mantenha este import para a formatação de datas
 import '../services/weather_service.dart';
-import '../services/geodb_service.dart'; // Importe a nova API
-import 'package:flutterapp/pages/forecast_page.dart';
+import '../services/geodb_service.dart';
 
 class WeatherScreen extends StatefulWidget {
   @override
@@ -12,6 +12,7 @@ class WeatherScreen extends StatefulWidget {
 class _WeatherScreenState extends State<WeatherScreen> {
   final _cityController = TextEditingController();
   Future<Map<String, dynamic>>? _weatherData;
+  bool _showForecastPopup = false;
 
   @override
   void initState() {
@@ -25,7 +26,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     });
   }
 
-  // A função de pesquisa agora será chamada quando uma sugestão for selecionada
   void _onCitySelected(String city) {
     _cityController.text = city;
     setState(() {
@@ -33,25 +33,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
     });
   }
 
-  void _navigateToForecast() {
-    Navigator.push(
-      context,
-      PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) =>
-            const ForecastPage(),
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          const begin = Offset(0.0, 1.0);
-          const end = Offset.zero;
-          const curve = Curves.ease;
-          var tween =
-              Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-          return SlideTransition(
-            position: animation.drive(tween),
-            child: child,
-          );
-        },
-      ),
-    );
+  void _toggleForecastPopup() {
+    setState(() {
+      _showForecastPopup = !_showForecastPopup;
+    });
   }
 
   @override
@@ -60,8 +45,43 @@ class _WeatherScreenState extends State<WeatherScreen> {
     super.dispose();
   }
 
+  // Função para processar os dados da API e extrair a previsão diária (da antiga forecast_page.dart)
+  List<Map<String, dynamic>> _processDailyForecast(List<dynamic> forecastList) {
+    final Map<String, List<double>> dailyTemps = {};
+    for (var item in forecastList) {
+      final date = DateFormat('EEE, d MMM')
+          .format(DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000));
+      final temp = item['main']['temp'].toDouble();
+      if (!dailyTemps.containsKey(date)) {
+        dailyTemps[date] = [temp, temp];
+      } else {
+        if (temp < dailyTemps[date]![0]) {
+          dailyTemps[date]![0] = temp;
+        }
+        if (temp > dailyTemps[date]![1]) {
+          dailyTemps[date]![1] = temp;
+        }
+      }
+    }
+    final List<Map<String, dynamic>> processedList = [];
+    dailyTemps.forEach((day, temps) {
+      final dailyDescription = forecastList.firstWhere((item) =>
+          DateFormat('EEE, d MMM')
+              .format(DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000)) ==
+          day)['weather'][0]['description'];
+      processedList.add({
+        'day': day,
+        'min_temp': temps[0],
+        'max_temp': temps[1],
+        'description': dailyDescription
+      });
+    });
+    return processedList;
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Usamos um Stack para sobrepor os widgets (fundo e pop-up)
     return Scaffold(
       appBar: AppBar(
         title: const Text('Clima App'),
@@ -73,93 +93,201 @@ class _WeatherScreenState extends State<WeatherScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: <Widget>[
-            // Substituímos o TextField pelo TypeAheadField
-            TypeAheadField(
-              textFieldConfiguration: TextFieldConfiguration(
-                controller: _cityController,
-                decoration: const InputDecoration(
-                  labelText: 'Digite uma cidade',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              suggestionsCallback: (pattern) async {
-                // Chama a função da API GeoDB para obter sugestões
-                return await searchCities(pattern);
-              },
-              itemBuilder: (context, suggestion) {
-                // Constrói o item da lista de sugestões
-                return ListTile(
-                  title: Text(suggestion),
-                );
-              },
-              onSuggestionSelected: (suggestion) {
-                // O que acontece quando uma sugestão é clicada
-                _onCitySelected(suggestion);
-              },
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: Center(
-                child: FutureBuilder<Map<String, dynamic>>(
-                  future: _weatherData,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const CircularProgressIndicator();
-                    } else if (snapshot.hasError) {
-                      return Text(
-                        'Erro: ${snapshot.error}',
-                        style: const TextStyle(color: Colors.red),
-                        textAlign: TextAlign.center,
-                      );
-                    } else if (snapshot.hasData) {
-                      final currentData = snapshot.data!;
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text(
-                            '${currentData['name']}, ${currentData['sys']['country']}',
-                            style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            '${currentData['main']['temp'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(
-                                fontSize: 64, fontWeight: FontWeight.w300),
-                          ),
-                          Text(
-                            'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            currentData['weather'][0]['description'],
-                            style: const TextStyle(
-                                fontSize: 24, fontStyle: FontStyle.italic),
-                          ),
-                          const SizedBox(height: 40),
-                          ElevatedButton(
-                            onPressed: _navigateToForecast,
-                            child: const Text('Ver Previsão de 5 Dias'),
-                          ),
-                        ],
-                      );
-                    } else {
-                      return const Text(
-                          'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.');
-                    }
+      body: Stack(
+        children: [
+          // Conteúdo principal da tela
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: <Widget>[
+                TypeAheadField(
+                  textFieldConfiguration: TextFieldConfiguration(
+                    controller: _cityController,
+                    decoration: const InputDecoration(
+                      labelText: 'Digite uma cidade',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  suggestionsCallback: (pattern) async {
+                    return await searchCities(pattern);
+                  },
+                  itemBuilder: (context, suggestion) {
+                    return ListTile(
+                      title: Text(suggestion),
+                    );
+                  },
+                  onSuggestionSelected: (suggestion) {
+                    _onCitySelected(suggestion);
                   },
                 ),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: Center(
+                    child: FutureBuilder<Map<String, dynamic>>(
+                      future: _weatherData,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const CircularProgressIndicator();
+                        } else if (snapshot.hasError) {
+                          return Text(
+                            'Erro: ${snapshot.error}',
+                            style: const TextStyle(color: Colors.red),
+                            textAlign: TextAlign.center,
+                          );
+                        } else if (snapshot.hasData) {
+                          final currentData = snapshot.data!;
+                          return Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: <Widget>[
+                              Text(
+                                '${currentData['name']}, ${currentData['sys']['country']}',
+                                style: const TextStyle(
+                                    fontSize: 32, fontWeight: FontWeight.bold),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                '${currentData['main']['temp'].toStringAsFixed(1)}°C',
+                                style: const TextStyle(
+                                    fontSize: 64, fontWeight: FontWeight.w300),
+                              ),
+                              Text(
+                                'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
+                                style: const TextStyle(fontSize: 20),
+                              ),
+                              const SizedBox(height: 20),
+                              Text(
+                                currentData['weather'][0]['description'],
+                                style: const TextStyle(
+                                    fontSize: 24, fontStyle: FontStyle.italic),
+                              ),
+                              const SizedBox(height: 40),
+                              ElevatedButton(
+                                onPressed: _toggleForecastPopup,
+                                child: const Text('Ver Previsão de 5 Dias'),
+                              ),
+                            ],
+                          );
+                        } else {
+                          return const Text(
+                              'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.');
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Pop-up com AnimatedContainer e fundo escurecido
+          if (_showForecastPopup)
+            GestureDetector(
+              onTap: _toggleForecastPopup,
+              child: AnimatedContainer(
+                duration:
+                    const Duration(milliseconds: 500), // Aumentar a duração
+                color: Colors.black.withOpacity(0.5),
+                alignment: Alignment.bottomCenter,
+                child: Hero(
+                  tag: 'forecast-popup',
+                  child: AnimatedContainer(
+                    duration:
+                        const Duration(milliseconds: 500), // Aumentar a duração
+                    curve: Curves.easeOutExpo, // Curva mais suave na chegada
+                    height: _showForecastPopup
+                        ? MediaQuery.of(context).size.height * 0.75
+                        : 0,
+                    width: MediaQuery.of(context).size.width,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: Column(
+                      children: [
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: IconButton(
+                            icon: const Icon(Icons.close, color: Colors.black),
+                            onPressed: _toggleForecastPopup,
+                          ),
+                        ),
+                        const Text(
+                          'Previsão de 5 Dias',
+                          style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black),
+                        ),
+                        const Divider(),
+                        Expanded(
+                          child: _ForecastContent(
+                            processDailyForecast: _processDailyForecast,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ],
-        ),
+        ],
       ),
+    );
+  }
+}
+
+// Novo Widget para o conteúdo da previsão (para organizar o código)
+class _ForecastContent extends StatelessWidget {
+  final Function(List<dynamic>) processDailyForecast;
+
+  const _ForecastContent({required this.processDailyForecast});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: get5DayForecastByLocation(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(
+            child: Text(
+              'Erro: ${snapshot.error}',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+          );
+        } else if (snapshot.hasData) {
+          final forecastData = snapshot.data!;
+          final List<dynamic> forecastList = forecastData['list'];
+
+          if (forecastList.isEmpty) {
+            return const Center(
+                child: Text('Nenhum dado de previsão encontrado.'));
+          }
+
+          final dailyForecast = processDailyForecast(forecastList);
+
+          return ListView.builder(
+            itemCount: dailyForecast.length,
+            itemBuilder: (context, index) {
+              final dayData = dailyForecast[index];
+              return ListTile(
+                title: Text(dayData['day']),
+                subtitle: Text(
+                  'Min: ${dayData['min_temp'].toStringAsFixed(1)}°C / Máx: ${dayData['max_temp'].toStringAsFixed(1)}°C',
+                ),
+                trailing: Text(dayData['description']),
+              );
+            },
+          );
+        } else {
+          return const Center(
+              child: Text('Nenhum dado de previsão encontrado.'));
+        }
+      },
     );
   }
 }
