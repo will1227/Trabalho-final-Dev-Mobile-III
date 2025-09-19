@@ -133,101 +133,132 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       final currentData = snapshot.data!;
                       final iconCode = currentData['weather'][0]['icon'];
                       final iconPath = iconMap[iconCode];
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          Text(
-                            '${currentData['name']}, ${currentData['sys']['country']}',
-                            style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-                          if (iconPath != null)
-                            SvgPicture.asset(
-                              'assets/weather_animations/$iconPath',
-                              width: 150,
-                              height: 150,
-                            )
-                          else
-                            const Icon(Icons.wb_sunny, size: 150),
-                          Text(
-                            '${currentData['main']['temp'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(
-                                fontSize: 64, fontWeight: FontWeight.w300),
-                          ),
-                          Text(
-                            'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(fontSize: 20),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            currentData['weather'][0]['description'],
-                            style: const TextStyle(
-                                fontSize: 24, fontStyle: FontStyle.italic),
-                          ),
-                          const SizedBox(height: 40),
-                          // Aqui está a mudança crucial!
-                          ElevatedButton(
-                            onPressed: () {
-                              final String city = _cityController.text.trim();
-                              Future<Map<String, dynamic>> forecastFuture;
 
-                              // Se o usuário pesquisou uma cidade, use a API por cidade
-                              if (city.isNotEmpty) {
-                                forecastFuture = get5DayForecastByCity(city);
-                              } else {
-                                // Caso contrário, use a API por localização
-                                forecastFuture = get5DayForecastByLocation();
-                              }
+                      // Animação de Opacidade para o conteúdo principal
+                      return AnimatedOpacity(
+                        opacity:
+                            snapshot.connectionState == ConnectionState.done
+                                ? 1.0
+                                : 0.0,
+                        duration: const Duration(milliseconds: 500),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            // Animando o contêiner do cartão do clima
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 500),
+                              curve: Curves.easeInOut,
+                              padding: const EdgeInsets.all(24.0),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).cardColor,
+                                borderRadius: BorderRadius.circular(15.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    '${currentData['name']}, ${currentData['sys']['country']}',
+                                    style: const TextStyle(
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.bold),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (iconPath != null)
+                                    SvgPicture.asset(
+                                      'assets/weather_animations/$iconPath',
+                                      width: 150,
+                                      height: 150,
+                                    )
+                                  else
+                                    const Icon(Icons.wb_sunny, size: 150),
+                                  Text(
+                                    '${currentData['main']['temp'].toStringAsFixed(1)}°C',
+                                    style: const TextStyle(
+                                        fontSize: 64,
+                                        fontWeight: FontWeight.w300),
+                                  ),
+                                  Text(
+                                    'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
+                                    style: const TextStyle(fontSize: 20),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  Text(
+                                    currentData['weather'][0]['description'],
+                                    style: const TextStyle(
+                                        fontSize: 24,
+                                        fontStyle: FontStyle.italic),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                            ElevatedButton(
+                              onPressed: () {
+                                final String city = _cityController.text.trim();
+                                Future<Map<String, dynamic>> forecastFuture;
 
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(20)),
-                                ),
-                                builder: (context) {
-                                  return SizedBox(
-                                    height: MediaQuery.of(context).size.height *
-                                        0.75,
-                                    child: Column(
-                                      children: [
-                                        Container(
-                                          height: 5,
-                                          width: 40,
-                                          margin: const EdgeInsets.symmetric(
-                                              vertical: 10),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[300],
-                                            borderRadius:
-                                                BorderRadius.circular(2.5),
+                                if (city.isNotEmpty) {
+                                  forecastFuture = get5DayForecastByCity(city);
+                                } else {
+                                  forecastFuture = get5DayForecastByLocation();
+                                }
+
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20)),
+                                  ),
+                                  builder: (context) {
+                                    return SizedBox(
+                                      height:
+                                          MediaQuery.of(context).size.height *
+                                              0.75,
+                                      child: Column(
+                                        children: [
+                                          Container(
+                                            height: 5,
+                                            width: 40,
+                                            margin: const EdgeInsets.symmetric(
+                                                vertical: 10),
+                                            decoration: BoxDecoration(
+                                              color: Colors.grey[300],
+                                              borderRadius:
+                                                  BorderRadius.circular(2.5),
+                                            ),
                                           ),
-                                        ),
-                                        const Text(
-                                          'Previsão de 5 Dias',
-                                          style: TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                        const Divider(),
-                                        Expanded(
-                                          child: _ForecastContent(
-                                            processDailyForecast:
-                                                _processDailyForecast,
-                                            forecastFuture: forecastFuture,
+                                          const Text(
+                                            'Previsão de 5 Dias',
+                                            style: TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.bold),
                                           ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                            child: const Text('Ver Previsão de 5 Dias'),
-                          ),
-                        ],
+                                          const Divider(),
+                                          Expanded(
+                                            child: _ForecastContent(
+                                              processDailyForecast:
+                                                  _processDailyForecast,
+                                              forecastFuture: forecastFuture,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              child: const Text('Ver Previsão de 5 Dias'),
+                            ),
+                          ],
+                        ),
                       );
                     } else {
                       return const Text(
@@ -244,7 +275,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 }
 
-// O Widget _ForecastContent precisa ser ajustado para receber o Future
+// O Widget _ForecastContent continua inalterado
+
 class _ForecastContent extends StatelessWidget {
   final Function(List<dynamic>) processDailyForecast;
   final Future<Map<String, dynamic>> forecastFuture;
@@ -257,7 +289,7 @@ class _ForecastContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: forecastFuture, // Agora ele usa o Future passado no construtor
+      future: forecastFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
