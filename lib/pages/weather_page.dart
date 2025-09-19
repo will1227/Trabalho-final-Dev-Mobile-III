@@ -35,45 +35,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     });
   }
 
-  // Novo método para exibir o pop-up de previsão usando showModalBottomSheet
-  void _showForecastPopup() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true, // Permite que o pop-up ocupe 75% da tela
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.75,
-          child: Column(
-            children: [
-              Container(
-                height: 5,
-                width: 40,
-                margin: const EdgeInsets.symmetric(vertical: 10),
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-              const Text(
-                'Previsão de 5 Dias',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const Divider(),
-              Expanded(
-                child: _ForecastContent(
-                  processDailyForecast: _processDailyForecast,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   @override
   void dispose() {
     _cityController.dispose();
@@ -100,7 +61,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
     final List<Map<String, dynamic>> processedList = [];
     dailyTemps.forEach((day, temps) {
-      // Encontra a descrição e o ícone do dia.
       final dailyData = forecastList.firstWhere((item) =>
           DateFormat('EEE, d MMM')
               .format(DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000)) ==
@@ -173,7 +133,6 @@ class _WeatherScreenState extends State<WeatherScreen> {
                       final currentData = snapshot.data!;
                       final iconCode = currentData['weather'][0]['icon'];
                       final iconPath = iconMap[iconCode];
-
                       return Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
@@ -208,8 +167,64 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 fontSize: 24, fontStyle: FontStyle.italic),
                           ),
                           const SizedBox(height: 40),
+                          // Aqui está a mudança crucial!
                           ElevatedButton(
-                            onPressed: _showForecastPopup,
+                            onPressed: () {
+                              final String city = _cityController.text.trim();
+                              Future<Map<String, dynamic>> forecastFuture;
+
+                              // Se o usuário pesquisou uma cidade, use a API por cidade
+                              if (city.isNotEmpty) {
+                                forecastFuture = get5DayForecastByCity(city);
+                              } else {
+                                // Caso contrário, use a API por localização
+                                forecastFuture = get5DayForecastByLocation();
+                              }
+
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (context) {
+                                  return SizedBox(
+                                    height: MediaQuery.of(context).size.height *
+                                        0.75,
+                                    child: Column(
+                                      children: [
+                                        Container(
+                                          height: 5,
+                                          width: 40,
+                                          margin: const EdgeInsets.symmetric(
+                                              vertical: 10),
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey[300],
+                                            borderRadius:
+                                                BorderRadius.circular(2.5),
+                                          ),
+                                        ),
+                                        const Text(
+                                          'Previsão de 5 Dias',
+                                          style: TextStyle(
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                        const Divider(),
+                                        Expanded(
+                                          child: _ForecastContent(
+                                            processDailyForecast:
+                                                _processDailyForecast,
+                                            forecastFuture: forecastFuture,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                             child: const Text('Ver Previsão de 5 Dias'),
                           ),
                         ],
@@ -229,15 +244,20 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 }
 
+// O Widget _ForecastContent precisa ser ajustado para receber o Future
 class _ForecastContent extends StatelessWidget {
   final Function(List<dynamic>) processDailyForecast;
+  final Future<Map<String, dynamic>> forecastFuture;
 
-  const _ForecastContent({required this.processDailyForecast});
+  const _ForecastContent({
+    required this.processDailyForecast,
+    required this.forecastFuture,
+  });
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: get5DayForecastByLocation(),
+      future: forecastFuture, // Agora ele usa o Future passado no construtor
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
