@@ -5,6 +5,27 @@ import 'package:geolocator/geolocator.dart';
 
 const String apiKey = '7ccf050c4bcbafd738acaf8e740d11b9';
 
+const Map<String, String> iconMap = {
+  '01d': 'clear-day.svg',
+  '01n': 'clear-night.svg',
+  '02d': 'cloudy-1-day.svg',
+  '02n': 'cloudy-1-night.svg',
+  '03d': 'cloudy.svg',
+  '03n': 'cloudy.svg',
+  '04d': 'cloudy.svg',
+  '04n': 'cloudy.svg',
+  '09d': 'rainy-1-day.svg',
+  '09n': 'rainy-1-night.svg',
+  '10d': 'rainy-2-day.svg',
+  '10n': 'rainy-2-night.svg',
+  '11d': 'isolated-thunderstorms-day.svg',
+  '11n': 'isolated-thunderstorms-night.svg',
+  '13d': 'snow.svg',
+  '13n': 'snow.svg',
+  '50d': 'haze-day.svg',
+  '50n': 'haze-night.svg',
+};
+
 Future<Map<String, dynamic>> getWeather(String city) async {
   final url =
       'https://api.openweathermap.org/data/2.5/weather?q=$city&appid=$apiKey&units=metric&lang=pt_br';

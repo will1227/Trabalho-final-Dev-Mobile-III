@@ -34,6 +34,8 @@ dependencies:
   geolocator: ^10.1.0
   intl: ^0.18.1
   flutter_typeahead: ^4.8.0
+  flutter_svg: ^2.0.7
+  lottie: ^2.6.0
 
   http:
   cached_network_image: ^3.4.1
@@ -68,6 +70,7 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/logotipo_firma.png
+    - assets/weather_animations/
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
