@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_typeahead/flutter_typeahead.dart';
-import 'package:intl/intl.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import '../services/weather_service.dart'; // Serviço responsável por buscar dados de clima
-import '../services/geodb_service.dart'; // Serviço responsável por buscar cidades
+import 'package:flutter_typeahead/flutter_typeahead.dart'; // Autocomplete para cidades
+import 'package:intl/intl.dart'; // Formatação de datas
+import 'package:flutter_svg/flutter_svg.dart'; // Para exibir ícones SVG
+import '../services/weather_service.dart'; // Serviço para buscar dados de clima
+import '../services/geodb_service.dart'; // Serviço para buscar cidades
 
 // Tela principal do aplicativo de clima
 class WeatherScreen extends StatefulWidget {
@@ -14,85 +14,94 @@ class WeatherScreen extends StatefulWidget {
 }
 
 class _WeatherScreenState extends State<WeatherScreen> {
-  final _cityController =
-      TextEditingController(); // Controlador para o campo de texto de cidade
+  final _cityController = TextEditingController(); // Controla o campo de cidade
   Future<Map<String, dynamic>>?
-      _weatherData; // Armazena os dados de clima que vêm da API
+      _weatherData; // Future que guarda os dados do clima
+
+  // Variável para animar a opacidade do container de clima
+  double _opacity = 0.0;
 
   @override
   void initState() {
     super.initState();
-    _fetchWeatherByCurrentLocation(); // Quando a tela abre, já busca o clima da localização atual
+    // Ao iniciar a tela, busca o clima pela localização atual
+    _fetchWeatherByCurrentLocation();
   }
 
-  // Busca os dados de clima baseados na localização atual do usuário
+  // Função que busca o clima usando GPS/localização do usuário
   void _fetchWeatherByCurrentLocation() {
     setState(() {
-      _weatherData = getWeatherByLocation();
+      _opacity = 0.0; // Esconde o conteúdo antes de atualizar
+      _weatherData = getWeatherByLocation(); // Chamada à API
+    });
+
+    // Quando os dados chegarem, mostra o conteúdo com animação de opacidade
+    _weatherData!.then((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        setState(() {
+          _opacity = 1.0;
+        });
+      });
     });
   }
 
-  // Quando o usuário seleciona uma cidade no autocomplete
+  // Função chamada quando o usuário seleciona uma cidade no autocomplete
   void _onCitySelected(String city) {
     _cityController.text = city;
     setState(() {
-      _weatherData =
-          getWeather(city); // Faz a chamada da API para a cidade digitada
+      _opacity = 0.0; // Esconde o conteúdo antigo
+      _weatherData = getWeather(city); // Busca clima da cidade selecionada
+    });
+
+    // Mostra o novo conteúdo com animação
+    _weatherData!.then((_) {
+      Future.delayed(const Duration(milliseconds: 50), () {
+        setState(() {
+          _opacity = 1.0;
+        });
+      });
     });
   }
 
-  @override
-  void dispose() {
-    _cityController.dispose(); // Libera memória quando o widget for destruído
-    super.dispose();
-  }
-
-  // Processa os dados da previsão de 5 dias e gera valores diários (mínima, máxima, descrição, ícone)
+  // Função que processa a previsão de 5 dias para exibir apenas mín, máx, descrição e ícone por dia
   List<Map<String, dynamic>> _processDailyForecast(List<dynamic> forecastList) {
-    final Map<String, List<double>> dailyTemps =
-        {}; // Armazena mín e máx por dia
-
-    // Percorre cada item da lista da API
+    final Map<String, List<double>> dailyTemps = {};
     for (var item in forecastList) {
       final date = DateFormat('EEE, d MMM')
           .format(DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000));
       final temp = item['main']['temp'].toDouble();
 
-      // Se ainda não temos o dia, inicializa com mín e máx iguais
+      // Guarda temperatura mínima e máxima de cada dia
       if (!dailyTemps.containsKey(date)) {
         dailyTemps[date] = [temp, temp];
       } else {
-        // Atualiza mín e máx do dia
-        if (temp < dailyTemps[date]![0]) {
-          dailyTemps[date]![0] = temp;
-        }
-        if (temp > dailyTemps[date]![1]) {
-          dailyTemps[date]![1] = temp;
-        }
+        if (temp < dailyTemps[date]![0]) dailyTemps[date]![0] = temp;
+        if (temp > dailyTemps[date]![1]) dailyTemps[date]![1] = temp;
       }
     }
 
-    // Lista final processada para exibir
+    // Cria lista final com dia, mín/máx, descrição e ícone
     final List<Map<String, dynamic>> processedList = [];
-
-    // Para cada dia, pega também a descrição e o ícone correspondente
     dailyTemps.forEach((day, temps) {
       final dailyData = forecastList.firstWhere((item) =>
           DateFormat('EEE, d MMM')
               .format(DateTime.fromMillisecondsSinceEpoch(item['dt'] * 1000)) ==
           day);
-      final dailyDescription = dailyData['weather'][0]['description'];
-      final dailyIconCode = dailyData['weather'][0]['icon'];
-
       processedList.add({
         'day': day,
         'min_temp': temps[0],
         'max_temp': temps[1],
-        'description': dailyDescription,
-        'icon': dailyIconCode
+        'description': dailyData['weather'][0]['description'],
+        'icon': dailyData['weather'][0]['icon']
       });
     });
     return processedList;
+  }
+
+  @override
+  void dispose() {
+    _cityController.dispose(); // Libera memória do controlador
+    super.dispose();
   }
 
   @override
@@ -101,7 +110,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
       appBar: AppBar(
         title: const Text('Clima App'),
         actions: [
-          // Botão para atualizar pelo GPS
+          // Botão para atualizar clima pela localização
           IconButton(
             icon: const Icon(Icons.my_location),
             onPressed: _fetchWeatherByCurrentLocation,
@@ -112,8 +121,8 @@ class _WeatherScreenState extends State<WeatherScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          children: <Widget>[
-            // Campo de busca com autocomplete de cidades
+          children: [
+            // Campo de texto com autocomplete de cidades
             TypeAheadField(
               textFieldConfiguration: TextFieldConfiguration(
                 controller: _cityController,
@@ -122,119 +131,108 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   border: OutlineInputBorder(),
                 ),
               ),
-              suggestionsCallback: (pattern) async {
-                return await searchCities(
-                    pattern); // Busca cidades pelo texto digitado
-              },
-              itemBuilder: (context, suggestion) {
-                return ListTile(
-                  title: Text(suggestion),
-                );
-              },
-              onSuggestionSelected: (suggestion) {
-                _onCitySelected(
-                    suggestion); // Quando usuário escolhe uma cidade
-              },
+              suggestionsCallback: (pattern) async =>
+                  await searchCities(pattern),
+              itemBuilder: (context, suggestion) =>
+                  ListTile(title: Text(suggestion)),
+              onSuggestionSelected: _onCitySelected,
             ),
             const SizedBox(height: 20),
-
-            // Área principal do app (dados do clima atual)
             Expanded(
-              child: Center(
-                child: FutureBuilder<Map<String, dynamic>>(
-                  future: _weatherData, // Conecta os dados da API
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      // Enquanto carrega
-                      return const CircularProgressIndicator();
-                    } else if (snapshot.hasError) {
-                      // Se der erro
-                      return Text(
+              child: FutureBuilder<Map<String, dynamic>>(
+                future: _weatherData, // Conecta aos dados do clima
+                builder: (context, snapshot) {
+                  // Mostra indicador de carregamento enquanto espera
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  } else if (snapshot.hasError) {
+                    // Mostra erro caso a API falhe
+                    return Center(
+                      child: Text(
                         'Erro: ${snapshot.error}',
                         style: const TextStyle(color: Colors.red),
                         textAlign: TextAlign.center,
-                      );
-                    } else if (snapshot.hasData) {
-                      // Se os dados chegaram, monta a tela
-                      final currentData = snapshot.data!;
-                      final iconCode = currentData['weather'][0]['icon'];
-                      final iconPath = iconMap[iconCode];
+                      ),
+                    );
+                  } else if (snapshot.hasData) {
+                    final currentData = snapshot.data!;
+                    final iconCode = currentData['weather'][0]['icon'];
+                    final iconPath = iconMap[iconCode];
 
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: <Widget>[
-                          // Nome da cidade + país
-                          Text(
-                            '${currentData['name']}, ${currentData['sys']['country']}',
-                            style: const TextStyle(
-                                fontSize: 32, fontWeight: FontWeight.bold),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-
-                          // Ícone animado do clima
-                          if (iconPath != null)
-                            SvgPicture.asset(
-                              'assets/weather_animations/$iconPath',
-                              width: 150,
-                              height: 150,
-                            )
-                          else
-                            const Icon(Icons.wb_sunny, size: 150),
-
-                          // Temperatura atual
-                          Text(
-                            '${currentData['main']['temp'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(
-                                fontSize: 64, fontWeight: FontWeight.w300),
-                          ),
-
-                          // Sensação térmica
-                          Text(
-                            'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
-                            style: const TextStyle(fontSize: 20),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Descrição do clima (ex: "céu limpo")
-                          Text(
-                            currentData['weather'][0]['description'],
-                            style: const TextStyle(
-                                fontSize: 24, fontStyle: FontStyle.italic),
-                          ),
-
-                          const SizedBox(height: 40),
-
-                          // Botão que abre o modal com a previsão de 5 dias
-                          ElevatedButton(
-                            onPressed: () {
-                              final String city = _cityController.text.trim();
-                              Future<Map<String, dynamic>> forecastFuture;
-
-                              // Se o usuário digitou cidade, busca por cidade
-                              if (city.isNotEmpty) {
-                                forecastFuture = get5DayForecastByCity(city);
-                              } else {
-                                // Caso contrário, busca pela localização
-                                forecastFuture = get5DayForecastByLocation();
-                              }
-
-                              // Modal inferior para exibir a lista de previsões
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(20)),
-                                ),
-                                builder: (context) {
-                                  return SizedBox(
+                    // Container animado que aparece suavemente com opacidade
+                    return AnimatedOpacity(
+                      duration: const Duration(milliseconds: 700),
+                      opacity: _opacity,
+                      curve: Curves.easeInOut,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 700),
+                        curve: Curves.easeInOut,
+                        padding: const EdgeInsets.all(8.0),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Nome da cidade e país
+                            Text(
+                              '${currentData['name']}, ${currentData['sys']['country']}',
+                              style: const TextStyle(
+                                  fontSize: 32, fontWeight: FontWeight.bold),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 10),
+                            // Ícone do clima
+                            if (iconPath != null)
+                              SvgPicture.asset(
+                                'assets/weather_animations/$iconPath',
+                                width: 150,
+                                height: 150,
+                              )
+                            else
+                              const Icon(Icons.wb_sunny, size: 150),
+                            // Temperatura atual
+                            Text(
+                              '${currentData['main']['temp'].toStringAsFixed(1)}°C',
+                              style: const TextStyle(
+                                  fontSize: 64, fontWeight: FontWeight.w300),
+                            ),
+                            // Sensação térmica
+                            Text(
+                              'Sensação: ${currentData['main']['feels_like'].toStringAsFixed(1)}°C',
+                              style: const TextStyle(fontSize: 20),
+                            ),
+                            const SizedBox(height: 20),
+                            // Descrição do clima
+                            Text(
+                              currentData['weather'][0]['description'],
+                              style: const TextStyle(
+                                  fontSize: 24, fontStyle: FontStyle.italic),
+                            ),
+                            const SizedBox(height: 40),
+                            // Botão que abre modal com previsão de 5 dias
+                            ElevatedButton(
+                              onPressed: () {
+                                final String city = _cityController.text.trim();
+                                Future<Map<String, dynamic>> forecastFuture;
+                                if (city.isNotEmpty) {
+                                  forecastFuture = get5DayForecastByCity(city);
+                                } else {
+                                  forecastFuture = get5DayForecastByLocation();
+                                }
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20)),
+                                  ),
+                                  builder: (context) => SizedBox(
                                     height: MediaQuery.of(context).size.height *
                                         0.75,
                                     child: Column(
                                       children: [
-                                        // "alça" de arrastar
+                                        // "Alça" para arrastar o modal
                                         Container(
                                           height: 5,
                                           width: 40,
@@ -262,21 +260,24 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                         ),
                                       ],
                                     ),
-                                  );
-                                },
-                              );
-                            },
-                            child: const Text('Ver Previsão de 5 Dias'),
-                          ),
-                        ],
-                      );
-                    } else {
-                      // Caso inicial (sem dados ainda)
-                      return const Text(
-                          'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.');
-                    }
-                  },
-                ),
+                                  ),
+                                );
+                              },
+                              child: const Text('Ver Previsão de 5 Dias'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else {
+                    // Caso não haja dados ainda
+                    return const Center(
+                      child: Text(
+                        'Nenhum dado encontrado. Digite uma cidade ou use a sua localização.',
+                      ),
+                    );
+                  }
+                },
               ),
             ),
           ],
@@ -286,11 +287,10 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 }
 
-// Widget responsável por exibir a previsão detalhada de 5 dias
+// Widget que exibe a previsão detalhada de 5 dias
 class _ForecastContent extends StatelessWidget {
-  final Function(List<dynamic>)
-      processDailyForecast; // Função que processa dados
-  final Future<Map<String, dynamic>> forecastFuture; // Future da API
+  final Function(List<dynamic>) processDailyForecast;
+  final Future<Map<String, dynamic>> forecastFuture;
 
   const _ForecastContent({
     required this.processDailyForecast,
@@ -300,13 +300,13 @@ class _ForecastContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<Map<String, dynamic>>(
-      future: forecastFuture, // Usa os dados da API recebidos
+      future: forecastFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // Enquanto carrega
+          // Indicador de carregamento
           return const Center(child: CircularProgressIndicator());
         } else if (snapshot.hasError) {
-          // Se ocorrer erro
+          // Mostra erro
           return Center(
             child: Text(
               'Erro: ${snapshot.error}',
@@ -317,22 +317,16 @@ class _ForecastContent extends StatelessWidget {
         } else if (snapshot.hasData) {
           final forecastData = snapshot.data!;
           final List<dynamic> forecastList = forecastData['list'];
-
           if (forecastList.isEmpty) {
             return const Center(
                 child: Text('Nenhum dado de previsão encontrado.'));
           }
-
-          // Processa os dados para exibir apenas mín/máx e descrição por dia
           final dailyForecast = processDailyForecast(forecastList);
-
-          // Lista de previsões dos próximos dias
           return ListView.builder(
             itemCount: dailyForecast.length,
             itemBuilder: (context, index) {
               final dayData = dailyForecast[index];
               final iconPath = iconMap[dayData['icon']];
-
               return ListTile(
                 leading: iconPath != null
                     ? SvgPicture.asset(

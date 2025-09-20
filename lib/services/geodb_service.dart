@@ -15,7 +15,6 @@ Future<List<String>> searchCities(String query) async {
     {
       'namePrefix': query,
       'limit': '5', // Limita a 5 resultados para não sobrecarregar
-      'sort': '-population', // Ordena por população
       'languageCode': 'pt'
     },
   );
